@@ -1,31 +1,34 @@
-PROJ := inversum-aetatis
-LIB := inversum
+PROJ := dreamssh
+LIB := dreamssh
 GITHUB_REPO := github.com:dreamhost/$(PROJ).git
 PKG_NAME := $(PROJ)
 TMP_FILE ?= /tmp/MSG
 VIRT_DIR ?= .venv
 
+keygen:
+	@python -c "from dreamssh import app;from dreamssh.sdk import scripts;scripts.KeyGen()"
+
 run:
-	twistd -n inversum
+	twistd -n dreamssh
 
 daemon:
-	twistd inversum
+	twistd dreamssh
 
 shell:
-	-@ssh -p 6622 127.0.0.1
+	@python -c "from dreamssh import app;from dreamssh.sdk import scripts;scripts.ConnectToShell()"
 
 stop:
-	kill `cat twistd.pid`
+	@python -c "from dreamssh import app;from dreamssh.sdk import scripts;scripts.StopDaemon()"
 
-test-run:
+run-test:
 	make daemon && make shell && make stop
 
 banner:
-	python -c "from inversum import config; print config.ssh.banner;"
+	python -c "from $(LIB) import config; print config.ssh.banner;"
 
 generate-config:
 	rm -rf ~/.$(PROJ)/config.ini
-	python -c "from inversum import config; config.writeDefaults();"
+	python -c "from $(LIB) import config; config.writeDefaults();"
 
 log-concise:
 	git log --oneline
@@ -43,12 +46,11 @@ log-changes:
 	git log --format='%ad %n* %B %N%n' --date=short
 
 clean:
-	find ./ -name "*~" -exec rm {} \;
-	find ./ -name "*.pyc" -exec rm {} \;
-	find ./ -name "*.pyo" -exec rm {} \;
-	find . -name "*.sw[op]" -exec rm {} \;
-	rm -rf _trial_temp/ build/ dist/ MANIFEST \
-		CHECK_THIS_BEFORE_UPLOAD.txt *.egg-info
+	sudo rm -rfv dist/ build/ MANIFEST *.egg-info
+	rm -rfv _trial_temp/ CHECK_THIS_BEFORE_UPLOAD.txt twistd.log
+	find ./ -name "*~" -exec rm -v {} \;
+	sudo find ./ -name "*.py[co]" -exec rm -v {} \;
+	find . -name "*.sw[op]" -exec rm -v {} \;
 
 push:
 	git push --all git@$(GITHUB_REPO)
@@ -72,7 +74,7 @@ stat:
 	@echo "### Git branches ###"
 	@echo
 	@git branch
-	@echo 
+	@echo
 
 status: stat
 .PHONY: status
@@ -81,10 +83,6 @@ todo:
 	git grep -n -i -2 XXX
 	git grep -n -i -2 TODO
 .PHONY: todo
-
-build:
-	python setup.py build
-	python setup.py sdist
 
 build-docs:
 	cd docs/sphinx; make html
@@ -128,8 +126,18 @@ clean-virt: clean
 virtual-build-clean: clean-virt build virtual-build
 .PHONY: virtual-build-clean
 
-register:
+build:
+	python setup.py build
+	python setup.py sdist
+
+install:
+	sudo pip install .
+
+uninstall:
+	sudo pip uninstall dreamssh
+
+register: clean
 	python setup.py register
 
-upload: check
+upload: clean check
 	python setup.py sdist upload --show-response
